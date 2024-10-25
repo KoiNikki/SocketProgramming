@@ -17,12 +17,23 @@ int passive_socket = -1;
 int open_data_connection() {
     if (passive_socket != -1) {
         int data_socket = accept(passive_socket, NULL, NULL);
+        if (data_socket < 0) {
+            perror("Accept failed");
+            close(passive_socket);
+            passive_socket = -1;
+            return -1;
+        }
         close(passive_socket);
         passive_socket = -1;
         return data_socket;
     } else if (client_data_addr.sin_port != 0) {
         int data_socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (data_socket < 0) {
+            perror("Socket creation failed");
+            return -1;
+        }
         if (connect(data_socket, (struct sockaddr *)&client_data_addr, sizeof(client_data_addr)) < 0) {
+            perror("Connect failed");
             close(data_socket);
             return -1;
         }
@@ -32,31 +43,39 @@ int open_data_connection() {
     }
 }
 
+
 void handle_port_command(int client_socket, const char *buffer) {
     int h1, h2, h3, h4, p1, p2;
     char ip[16];
     int port;
 
-    // 解析PORT命令中的IP地址和端口
+    // 解析 PORT 命令中的 IP 地址和端口
     if (sscanf(buffer, "PORT %d,%d,%d,%d,%d,%d", &h1, &h2, &h3, &h4, &p1, &p2) != 6) {
         send(client_socket, "500 Syntax error, command unrecognized.\r\n", 41, 0);
         return;
     }
 
-    // 构造IP地址字符串
+    // 构造 IP 地址字符串
     snprintf(ip, sizeof(ip), "%d.%d.%d.%d", h1, h2, h3, h4);
 
     // 计算端口号
     port = p1 * 256 + p2;
 
+    // 清零 client_data_addr 结构体
+    memset(&client_data_addr, 0, sizeof(client_data_addr));
+
     // 设置客户端数据地址结构
     client_data_addr.sin_family = AF_INET;
     client_data_addr.sin_port = htons(port);
-    inet_pton(AF_INET, ip, &client_data_addr.sin_addr);
+    if (inet_pton(AF_INET, ip, &client_data_addr.sin_addr) <= 0) {
+        send(client_socket, "500 Invalid IP address.\r\n", 25, 0);
+        return;
+    }
 
     // 发送成功响应
     send(client_socket, "200 PORT command successful.\r\n", 30, 0);
 }
+
 
 void handle_pasv_command(int client_socket) {
     // 随机生成一个端口（20000-65535范围内）
@@ -106,16 +125,16 @@ void handle_pasv_command(int client_socket) {
 }
 
 // 实现 LIST 命令
-void handle_list_command(int client_socket) {
+void handle_list_command(int client_socket, const char *directory) {
     int data_socket = open_data_connection();
     if (data_socket < 0) {
         send(client_socket, "425 Can't open data connection.\r\n", 33, 0);
         return;
     }
 
-    send(client_socket, "150 Here comes the directory listing.\r\n", 38, 0);
+    send(client_socket, "150 Here comes the directory listing.\r\n", 39, 0);
 
-    DIR *dir = opendir("tmp");
+    DIR *dir = opendir(directory);
     struct dirent *entry;
     char buffer[1024];
 

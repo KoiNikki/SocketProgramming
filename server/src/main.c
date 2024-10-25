@@ -4,7 +4,7 @@
 #include <arpa/inet.h>
 #include "connection_manager.h"
 
-void run_server(int port)
+void run_server(int port, const char *directory)
 {
     int server_socket;
     int client_sockets[MAX_CLIENTS] = {0};
@@ -41,13 +41,18 @@ void run_server(int port)
 
     printf("Server listening on port %d\n", port);
 
-    handle_connections(server_socket, client_sockets);
+    handle_connections(server_socket, client_sockets, directory);
 }
 
 int main(int argc, char *argv[])
 {
     // int port = 21;
     int port = 2121;
-    run_server(port);
+    const char *directory = "tmp";
+    if (argc > 1) {
+        directory = argv[1];
+    }
+
+    run_server(port, directory);
     return 0;
 }

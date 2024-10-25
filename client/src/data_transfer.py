@@ -56,11 +56,27 @@ def handle_pasv(sock):
         return None, None
 
 def handle_list(sock, data_socket=None):
-    # 如果在PORT模式下使用，接收一个数据套接字
-    if not data_socket:
-        server_ip, server_port = handle_pasv(sock)
-        data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if data_socket:
+        # PORT 模式
+        handle_list_port(sock, data_socket)
+    else:
+        # PASV 模式
+        handle_list_pasv(sock)
+
+def handle_list_pasv(sock):
+    # 使用 PASV 模式
+    server_ip, server_port = handle_pasv(sock)
+    if not server_ip or not server_port:
+        print("Failed to enter PASV mode.")
+        return
+
+    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
         data_socket.connect((server_ip, server_port))
+    except Exception as e:
+        print(f"Error connecting to PASV data socket: {e}")
+        data_socket.close()
+        return
 
     # 发送 LIST 命令
     response = send_command(sock, "LIST")
@@ -68,52 +84,103 @@ def handle_list(sock, data_socket=None):
 
     if "150" in response:
         # 接收并打印目录列表
+        receive_list_data(data_socket)
+        response = sock.recv(1024).decode()
+        print(response)
+
+def handle_list_port(sock, data_socket):
+    # PORT 模式下，直接发送 LIST 指令
+    response = send_command(sock, "LIST")
+    print(response)
+
+    if "150" in response:
+        # 接收并打印目录列表
+        client_socket, _ = data_socket.accept()
+        receive_list_data(client_socket)
+        client_socket.close()
+
+        response = sock.recv(1024).decode()
+        print(response)
+
+def receive_list_data(data_socket):
+    """通用接收列表数据的函数"""
+    try:
         while True:
             data = data_socket.recv(1024).decode()
             if not data:
                 break
             print(data)
-
+    finally:
         data_socket.close()
-        response = sock.recv(1024).decode()
-        print(response)
 
 def handle_retr(sock, filename, data_socket=None):
-    # 如果在PORT模式下使用，接收一个数据套接字
-    if not data_socket:
-        server_ip, server_port = handle_pasv(sock)
-        data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if data_socket:
+        # PORT 模式
+        handle_retr_port(sock, filename, data_socket)
+    else:
+        # PASV 模式
+        handle_retr_pasv(sock, filename)
+
+def handle_stor(sock, filename, data_socket=None):
+    if data_socket:
+        # PORT 模式
+        handle_stor_port(sock, filename, data_socket)
+    else:
+        # PASV 模式
+        handle_stor_pasv(sock, filename)
+
+def handle_retr_pasv(sock, filename):
+    # 使用 PASV 模式
+    server_ip, server_port = handle_pasv(sock)
+    if not server_ip or not server_port:
+        print("Failed to enter PASV mode.")
+        return
+
+    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
         data_socket.connect((server_ip, server_port))
+    except Exception as e:
+        print(f"Error connecting to PASV data socket: {e}")
+        data_socket.close()
+        return
 
     # 发送 RETR 命令
     response = send_command(sock, f"RETR {filename}")
     print(response)
 
     if "150" in response:
-        # 打开本地文件以写入模式保存接收到的数据
-        with open(filename, "wb") as f:
-            while True:
-                data = data_socket.recv(1024)
-                if not data:
-                    break
-                f.write(data)
-
-        data_socket.close()
+        # 接收文件数据并保存
+        receive_file_data(data_socket, filename)
         response = sock.recv(1024).decode()
         print(response)
-    else:
-        print("Failed to retrieve file.")
 
-def handle_stor(sock, filename, data_socket=None):
-    # 如果在PORT模式下使用，接收一个数据套接字
-    if not data_socket:
-        server_ip, server_port = handle_pasv(sock)
-        data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def handle_retr_port(sock, filename, data_socket):
+    # PORT 模式下发送 RETR 命令
+    response = send_command(sock, f"RETR {filename}")
+    print(response)
+
+    if "150" in response:
+        # 接受服务器的连接并接收文件数据
+        client_socket, _ = data_socket.accept()
+        receive_file_data(client_socket, filename)
+        client_socket.close()
+
+        response = sock.recv(1024).decode()
+        print(response)
+
+def handle_stor_pasv(sock, filename):
+    # 使用 PASV 模式
+    server_ip, server_port = handle_pasv(sock)
+    if not server_ip or not server_port:
+        print("Failed to enter PASV mode.")
+        return
+
+    data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
         data_socket.connect((server_ip, server_port))
-
-    # 检查文件是否存在
-    if not os.path.isfile(filename):
-        print(f"File '{filename}' not found.")
+    except Exception as e:
+        print(f"Error connecting to PASV data socket: {e}")
+        data_socket.close()
         return
 
     # 发送 STOR 命令
@@ -121,13 +188,47 @@ def handle_stor(sock, filename, data_socket=None):
     print(response)
 
     if "150" in response:
-        # 打开文件并将其内容发送到服务器
+        # 发送文件数据
+        send_file_data(data_socket, filename)
+        response = sock.recv(1024).decode()
+        print(response)
+
+def handle_stor_port(sock, filename, data_socket):
+    # PORT 模式下发送 STOR 命令
+    response = send_command(sock, f"STOR {filename}")
+    print(response)
+
+    if "150" in response:
+        # 接受服务器的连接并发送文件数据
+        client_socket, _ = data_socket.accept()
+        send_file_data(client_socket, filename)
+        client_socket.close()
+
+        response = sock.recv(1024).decode()
+        print(response)
+
+def receive_file_data(data_socket, filename):
+    """从数据连接中接收文件数据并保存"""
+    try:
+        with open(filename, "wb") as f:
+            while True:
+                data = data_socket.recv(1024)
+                if not data:
+                    break
+                f.write(data)
+    finally:
+        data_socket.close()
+
+def send_file_data(data_socket, filename):
+    """从本地文件读取数据并发送到数据连接"""
+    if not os.path.isfile(filename):
+        print(f"File '{filename}' not found.")
+        data_socket.close()
+        return
+
+    try:
         with open(filename, "rb") as f:
             while (data := f.read(1024)):
                 data_socket.sendall(data)
-
+    finally:
         data_socket.close()
-        response = sock.recv(1024).decode()
-        print(response)
-    else:
-        print("Failed to store file.")

@@ -10,7 +10,7 @@
 #include "command_parser.h"
 
 
-void handle_connections(int server_socket, int client_sockets[MAX_CLIENTS])
+void handle_connections(int server_socket, int client_sockets[MAX_CLIENTS], const char *directory)
 {
     int max_sd, activity, new_socket, sd;
     struct sockaddr_in client_addr;
@@ -100,7 +100,7 @@ void handle_connections(int server_socket, int client_sockets[MAX_CLIENTS])
                 else
                 {
                     // 客户端发送了数据，处理该客户端的请求
-                    handle_client(sd, buffer);
+                    handle_client(sd, buffer, directory);
                 }
             }
         }
