@@ -1,62 +1,108 @@
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <arpa/inet.h>
 #include <unistd.h>
+#include <errno.h>
 #include "connection_manager.h"
 #include "auth.h"
+#include "command_parser.h"
 
-// 发送欢迎消息
-void handle_welcome(int client_socket) {
-    send(client_socket, "220 Anonymous FTP server ready.\r\n", 34, 0);
-}
 
-// 处理 USER 命令
-void handle_user_command(int client_socket, const char *buffer) {
-    char username[100];
-    sscanf(buffer, "USER %s", username);
-    if (validate_user(username)) {
-        send(client_socket, "331 Please specify the password.\r\n", 34, 0);
-    } else {
-        send(client_socket, "530 Invalid username.\r\n", 23, 0);
-    }
-}
-
-// 处理 PASS 命令
-int handle_pass_command(int client_socket, const char *buffer) {
-    char password[100];
-    sscanf(buffer, "PASS %s", password);
-    if (validate_password(password)) {
-        send(client_socket, "230 Login successful.\r\n", 23, 0);
-        return 1;  // 登录成功
-    } else {
-        send(client_socket, "530 Invalid password.\r\n", 23, 0);
-        return 0;
-    }
-}
-
-// 处理客户端连接
-void handle_client(int client_socket) {
+void handle_connections(int server_socket, int client_sockets[MAX_CLIENTS])
+{
+    int max_sd, activity, new_socket, sd;
+    struct sockaddr_in client_addr;
+    fd_set readfds;
+    socklen_t addr_len = sizeof(client_addr);
     char buffer[1024];
-    int logged_in = 0;
 
-    while (1) {
-        memset(buffer, 0, sizeof(buffer));
-        int bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
-        if (bytes_received <= 0) {
-            break;
-        }
+    while (1)
+    {
+        // 清空并设置文件描述符集
+        FD_ZERO(&readfds);
+        FD_SET(server_socket, &readfds);
+        max_sd = server_socket;
 
-        // 处理 USER 命令
-        if (strncmp(buffer, "USER ", 5) == 0) {
-            handle_user_command(client_socket, buffer);
-        }
-        // 处理 PASS 命令
-        else if (strncmp(buffer, "PASS ", 5) == 0) {
-            logged_in = handle_pass_command(client_socket, buffer);
-            if (logged_in) {
-                break;  // 登录成功，退出循环
+        // 添加所有客户端套接字到文件描述符集中
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            sd = client_sockets[i];
+
+            // 如果套接字有效，添加到读文件描述符集
+            if (sd > 0)
+            {
+                FD_SET(sd, &readfds);
             }
-        } else {
-            send(client_socket, "500 Unknown command.\r\n", 22, 0);
+
+            // 更新最大文件描述符
+            if (sd > max_sd)
+            {
+                max_sd = sd;
+            }
+        }
+
+        // 使用 select 监听文件描述符活动
+        activity = select(max_sd + 1, &readfds, NULL, NULL, NULL);
+
+        if ((activity < 0) && (errno != EINTR))
+        {
+            printf("select error");
+        }
+
+        // 检查是否有新的客户端连接
+        if (FD_ISSET(server_socket, &readfds))
+        {
+            if ((new_socket = accept(server_socket, (struct sockaddr *)&client_addr, &addr_len)) < 0)
+            {
+                perror("accept");
+                exit(EXIT_FAILURE);
+            }
+
+            printf("New connection: socket fd is %d , ip is : %s , port : %d\n",
+                   new_socket, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+            // 发送欢迎信息
+            handle_welcome(new_socket);
+
+            // 将新套接字添加到客户端数组中
+            for (int i = 0; i < MAX_CLIENTS; i++)
+            {
+                if (client_sockets[i] == 0)
+                {
+                    client_sockets[i] = new_socket;
+                    printf("Adding new client to list as %d\n", i);
+                    break;
+                }
+            }
+        }
+
+        // 处理所有现有客户端的数据
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            sd = client_sockets[i];
+
+            if (FD_ISSET(sd, &readfds))
+            {
+                // 清空缓冲区
+                memset(buffer, 0, sizeof(buffer));
+                int bytes_received = recv(sd, buffer, sizeof(buffer) - 1, 0);
+
+                // 检查客户端是否关闭连接
+                if (bytes_received == 0 || bytes_received == -1)
+                {
+                    // 客户端关闭连接或发生错误
+                    printf("Client disconnected: fd %d\n", sd);
+                    close(sd);
+                    client_sockets[i] = 0;
+                }
+                else
+                {
+                    // 客户端发送了数据，处理该客户端的请求
+                    handle_client(sd, buffer);
+                }
+            }
         }
     }
 }
