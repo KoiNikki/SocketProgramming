@@ -95,6 +95,9 @@ void run_server(int port)
             printf("New connection: socket fd is %d , ip is : %s , port : %d\n",
                    new_socket, inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
 
+            // 发送欢迎信息
+            handle_welcome(new_socket);
+
             // 将新套接字添加到客户端数组中
             for (int i = 0; i < MAX_CLIENTS; i++)
             {
@@ -127,7 +130,8 @@ void run_server(int port)
 
 int main(int argc, char *argv[])
 {
-    int port = 21;
+    // int port = 21;
+    int port = 2121;
     run_server(port);
     return 0;
 }
