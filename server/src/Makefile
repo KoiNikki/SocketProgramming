@@ -3,7 +3,7 @@ CC = gcc
 
 CFLAGS = -Wall -Wextra -g  
 
-SRCS = auth.c command_parser.c connection_manager.c data_transfer.c file_operations.c main.c  
+SRCS = auth.c command_parser.c connection_manager.c data_transfer.c main.c  
 
 OBJS = $(patsubst %.c,build/%.o,$(SRCS))  
 

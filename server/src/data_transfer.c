@@ -1,8 +1,36 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
 #include <arpa/inet.h>
-#include "command_parser.h"
+#include "data_transfer.h"
 
 // 用于存储客户端指定的地址和端口
 struct sockaddr_in client_data_addr;
+int passive_socket = -1;
+
+// 打开数据连接
+int open_data_connection() {
+    if (passive_socket != -1) {
+        int data_socket = accept(passive_socket, NULL, NULL);
+        close(passive_socket);
+        passive_socket = -1;
+        return data_socket;
+    } else if (client_data_addr.sin_port != 0) {
+        int data_socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (connect(data_socket, (struct sockaddr *)&client_data_addr, sizeof(client_data_addr)) < 0) {
+            close(data_socket);
+            return -1;
+        }
+        return data_socket;
+    } else {
+        return -1;
+    }
+}
 
 void handle_port_command(int client_socket, const char *buffer) {
     int h1, h2, h3, h4, p1, p2;
@@ -29,8 +57,6 @@ void handle_port_command(int client_socket, const char *buffer) {
     // 发送成功响应
     send(client_socket, "200 PORT command successful.\r\n", 30, 0);
 }
-
-int passive_socket = -1;
 
 void handle_pasv_command(int client_socket) {
     // 随机生成一个端口（20000-65535范围内）
@@ -77,4 +103,90 @@ void handle_pasv_command(int client_socket) {
              ip[0], ip[1], ip[2], ip[3], p[0], p[1]);
 
     send(client_socket, response, strlen(response), 0);
+}
+
+// 实现 LIST 命令
+void handle_list_command(int client_socket) {
+    int data_socket = open_data_connection();
+    if (data_socket < 0) {
+        send(client_socket, "425 Can't open data connection.\r\n", 33, 0);
+        return;
+    }
+
+    send(client_socket, "150 Here comes the directory listing.\r\n", 38, 0);
+
+    DIR *dir = opendir("tmp");
+    struct dirent *entry;
+    char buffer[1024];
+
+    if (dir == NULL) {
+        send(client_socket, "550 Failed to open directory.\r\n", 31, 0);
+        close(data_socket);
+        return;
+    }
+
+    while ((entry = readdir(dir)) != NULL) {
+        snprintf(buffer, sizeof(buffer), "%s\r\n", entry->d_name);
+        send(data_socket, buffer, strlen(buffer), 0);
+    }
+
+    closedir(dir);
+    close(data_socket);
+    send(client_socket, "226 Directory send OK.\r\n", 24, 0);
+}
+
+// 实现 RETR 命令
+void handle_retr_command(int client_socket, const char *filename) {
+    int data_socket = open_data_connection();
+    if (data_socket < 0) {
+        send(client_socket, "425 Can't open data connection.\r\n", 33, 0);
+        return;
+    }
+
+    int file_fd = open(filename, O_RDONLY);
+    if (file_fd < 0) {
+        send(client_socket, "550 Failed to open file.\r\n", 26, 0);
+        close(data_socket);
+        return;
+    }
+
+    send(client_socket, "150 Opening binary mode data connection.\r\n", 42, 0);
+
+    char buffer[1024];
+    int bytes_read;
+    while ((bytes_read = read(file_fd, buffer, sizeof(buffer))) > 0) {
+        send(data_socket, buffer, bytes_read, 0);
+    }
+
+    close(file_fd);
+    close(data_socket);
+    send(client_socket, "226 Transfer complete.\r\n", 24, 0);
+}
+
+// 实现 STOR 命令
+void handle_stor_command(int client_socket, const char *filename) {
+    int data_socket = open_data_connection();
+    if (data_socket < 0) {
+        send(client_socket, "425 Can't open data connection.\r\n", 33, 0);
+        return;
+    }
+
+    int file_fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (file_fd < 0) {
+        send(client_socket, "550 Failed to create file.\r\n", 28, 0);
+        close(data_socket);
+        return;
+    }
+
+    send(client_socket, "150 Opening binary mode data connection.\r\n", 42, 0);
+
+    char buffer[1024];
+    int bytes_received;
+    while ((bytes_received = recv(data_socket, buffer, sizeof(buffer), 0)) > 0) {
+        write(file_fd, buffer, bytes_received);
+    }
+
+    close(file_fd);
+    close(data_socket);
+    send(client_socket, "226 Transfer complete.\r\n", 24, 0);
 }

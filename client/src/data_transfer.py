@@ -1,3 +1,4 @@
+import os
 import socket
 import random
 from command_sender import send_command
@@ -53,3 +54,80 @@ def handle_pasv(sock):
     else:
         print("Failed to enter PASV mode.")
         return None, None
+
+def handle_list(sock, data_socket=None):
+    # 如果在PORT模式下使用，接收一个数据套接字
+    if not data_socket:
+        server_ip, server_port = handle_pasv(sock)
+        data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        data_socket.connect((server_ip, server_port))
+
+    # 发送 LIST 命令
+    response = send_command(sock, "LIST")
+    print(response)
+
+    if "150" in response:
+        # 接收并打印目录列表
+        while True:
+            data = data_socket.recv(1024).decode()
+            if not data:
+                break
+            print(data)
+
+        data_socket.close()
+        response = sock.recv(1024).decode()
+        print(response)
+
+def handle_retr(sock, filename, data_socket=None):
+    # 如果在PORT模式下使用，接收一个数据套接字
+    if not data_socket:
+        server_ip, server_port = handle_pasv(sock)
+        data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        data_socket.connect((server_ip, server_port))
+
+    # 发送 RETR 命令
+    response = send_command(sock, f"RETR {filename}")
+    print(response)
+
+    if "150" in response:
+        # 打开本地文件以写入模式保存接收到的数据
+        with open(filename, "wb") as f:
+            while True:
+                data = data_socket.recv(1024)
+                if not data:
+                    break
+                f.write(data)
+
+        data_socket.close()
+        response = sock.recv(1024).decode()
+        print(response)
+    else:
+        print("Failed to retrieve file.")
+
+def handle_stor(sock, filename, data_socket=None):
+    # 如果在PORT模式下使用，接收一个数据套接字
+    if not data_socket:
+        server_ip, server_port = handle_pasv(sock)
+        data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        data_socket.connect((server_ip, server_port))
+
+    # 检查文件是否存在
+    if not os.path.isfile(filename):
+        print(f"File '{filename}' not found.")
+        return
+
+    # 发送 STOR 命令
+    response = send_command(sock, f"STOR {filename}")
+    print(response)
+
+    if "150" in response:
+        # 打开文件并将其内容发送到服务器
+        with open(filename, "rb") as f:
+            while (data := f.read(1024)):
+                data_socket.sendall(data)
+
+        data_socket.close()
+        response = sock.recv(1024).decode()
+        print(response)
+    else:
+        print("Failed to store file.")

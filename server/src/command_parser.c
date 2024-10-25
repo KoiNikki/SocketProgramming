@@ -6,6 +6,7 @@
 void handle_client(int client_socket, const char *buffer)
 {
     int logged_in = 0;
+    char directory[256] = "tmp";
 
     // 处理 USER
     if (strncmp(buffer, "USER ", 5) == 0)
@@ -26,6 +27,23 @@ void handle_client(int client_socket, const char *buffer)
     else if (strncmp(buffer, "PASV", 4) == 0)
     {
         handle_pasv_command(client_socket);
+    }
+    else if (strncmp(buffer, "LIST", 4) == 0) {
+        handle_list_command(client_socket);
+    }
+    else if (strncmp(buffer, "RETR ", 5) == 0) {
+        char filename[256];
+        sscanf(buffer, "RETR %s", filename);
+        char filepath[512];
+        snprintf(filepath, sizeof(filepath), "%s/%s", directory, filename);
+        handle_retr_command(client_socket, filepath);
+    }
+    else if (strncmp(buffer, "STOR ", 5) == 0) {
+        char filename[256];
+        sscanf(buffer, "STOR %s", filename);
+        char filepath[512];
+        snprintf(filepath, sizeof(filepath), "%s/%s", directory, filename);
+        handle_stor_command(client_socket, filepath);
     }
     else
     {
