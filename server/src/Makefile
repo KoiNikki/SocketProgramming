@@ -3,9 +3,9 @@ CC = gcc
 
 CFLAGS = -Wall -Wextra -g  
 
-SRCS = auth.c command_parser.c connection_manager.c data_transfer.c error_handling.c file_operations.c main.c  
+SRCS = auth.c command_parser.c connection_manager.c data_transfer.c file_operations.c main.c  
 
-OBJS = $(SRCS:.c=.o)  
+OBJS = $(patsubst %.c,build/%.o,$(SRCS))  
 
 TARGET = server  
 
@@ -14,10 +14,11 @@ all: $(TARGET)
 $(TARGET): $(OBJS)  
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)  
 
-%.o: %.c  
-	$(CC) $(CFLAGS) -c $< -o $@  
+build/%.o: %.c
+	@mkdir -p build
+	$(CC) $(CFLAGS) -c $< -o $@
 
-clean:  
-	rm -f $(OBJS) $(TARGET)  
+clean:
+	rm -rf build $(TARGET)  
  
 .PHONY: all clean

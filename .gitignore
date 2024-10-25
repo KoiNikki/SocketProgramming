@@ -1,4 +1,4 @@
-# C编译文件  
+# C
 *.o  
 *.out  
 *.exe  
@@ -6,20 +6,20 @@
 *.so  
 *.dSYM/  
 
-# Python虚拟环境  
+# Python
 venv/  
 env/  
 *.pyc  
 __pycache__/  
 
-# 日志文件  
+# log 
 *.log  
 
-# 操作系统生成的文件  
+# os
 .DS_Store  
 Thumbs.db  
 
-# IDE和编辑器配置文件  
+# ide
 .vscode/  
 .idea/  
 *.swp  
