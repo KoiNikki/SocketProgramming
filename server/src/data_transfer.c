@@ -1,5 +1,4 @@
 #include <stdio.h>
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -267,7 +266,7 @@ void handle_pwd_command(int client_socket, const char *current_directory, const 
     get_relative_path(root_directory, current_directory, relative_directory);
 
     // 返回相对路径
-    snprintf(response, sizeof(response), "257 \"%s\" is the current directory.\r\n", relative_directory);
+    snprintf(response, sizeof(response), "257 \"%.400s\" is the current directory.\r\n", relative_directory);
     send(client_socket, response, strlen(response), 0);
 }
 
@@ -277,8 +276,8 @@ int is_within_root(const char *root_directory, const char *new_directory)
     char real_root[PATH_MAX], real_new[PATH_MAX];
 
     // 获取 root_directory 和 new_directory 的真实绝对路径
-    char *q = realpath(root_directory, real_root);
-    char *p = realpath(new_directory, real_new);
+    realpath(root_directory, real_root);
+    realpath(new_directory, real_new);
 
     // 检查 new_directory 是否以 root_directory 为前缀
     return strncmp(real_root, real_new, strlen(real_root)) == 0;
@@ -292,8 +291,25 @@ void handle_cwd_command(int client_socket, const char *buffer, char *current_dir
     // 从 CWD 命令中提取目标路径
     sscanf(buffer, "CWD %s", target_directory);
 
-    // 构造新路径：基于 current_directory 和目标路径生成绝对路径
-    snprintf(new_path, sizeof(new_path), "%s/%s", current_directory, target_directory);
+    // 检查路径长度是否会超出 PATH_MAX
+    size_t current_len = strlen(current_directory);
+    size_t target_len = strlen(target_directory);
+
+    if (current_len + 1 + target_len + 1 > PATH_MAX) // +1 for '/' and +1 for null terminator
+    {
+        send(client_socket, "550 Path too long.\r\n", 20, 0);
+        return;
+    }
+
+    // 初始化 new_path 并拼接路径
+    strncpy(new_path, current_directory, PATH_MAX - 1);  // 复制 current_directory
+    new_path[PATH_MAX - 1] = '\0';  // 确保以 NULL 结尾
+
+    if (current_len > 0 && new_path[current_len - 1] != '/') {
+        strncat(new_path, "/", PATH_MAX - strlen(new_path) - 1);  // 添加斜杠
+    }
+
+    strncat(new_path, target_directory, PATH_MAX - strlen(new_path) - 1);  // 拼接目标路径
 
     // 检查是否超出根目录范围
     if (!is_within_root(root_directory, new_path))

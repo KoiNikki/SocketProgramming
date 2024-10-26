@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
 #include "auth.h"
 
 int validate_user(const char *username) {

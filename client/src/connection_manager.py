@@ -15,9 +15,7 @@ from data_transfer import (
 data_socket = None
 
 
-def handle_connection():
-    server_ip = "127.0.0.1"
-    server_port = 2121
+def handle_connection(server_ip, server_port):
 
     # 创建socket并连接到服务器
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

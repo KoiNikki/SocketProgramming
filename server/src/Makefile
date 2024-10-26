@@ -1,7 +1,7 @@
 
 CC = gcc  
 
-CFLAGS = -Wall -Wextra -g  
+CFLAGS = -Wall -g  
 
 SRCS = auth.c command_parser.c connection_manager.c data_transfer.c main.c  
 
