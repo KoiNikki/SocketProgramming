@@ -140,7 +140,6 @@ void handle_pasv_command(int client_socket)
     send_response(client_socket, response);
 }
 
-// 实现 LIST 命令
 void handle_list_command(int client_socket, char *current_directory)
 {
     int data_socket = open_data_connection();
@@ -174,7 +173,6 @@ void handle_list_command(int client_socket, char *current_directory)
     send_response(client_socket, "226 Directory send OK.\r\n");
 }
 
-// 实现 RETR 命令
 void handle_retr_command(int client_socket, const char *filename)
 {
     int data_socket = open_data_connection();
@@ -206,7 +204,6 @@ void handle_retr_command(int client_socket, const char *filename)
     send_response(client_socket, "226 Transfer complete.\r\n");
 }
 
-// 实现 STOR 命令
 void handle_stor_command(int client_socket, const char *filename)
 {
     int data_socket = open_data_connection();
@@ -238,7 +235,7 @@ void handle_stor_command(int client_socket, const char *filename)
     send_response(client_socket, "226 Transfer complete.\r\n");
 }
 
-// 辅助函数：生成相对路径
+// 生成相对路径
 void get_relative_path(const char *root_directory, const char *current_directory, char *relative_directory)
 {
     if (strncmp(current_directory, root_directory, strlen(root_directory)) == 0)
@@ -246,13 +243,11 @@ void get_relative_path(const char *root_directory, const char *current_directory
         snprintf(relative_directory, PATH_MAX, "%s", current_directory + strlen(root_directory));
         if (relative_directory[0] == '\0')
         {
-            // 如果没有相对路径部分，表示在根目录，显示为 "/"
             strcpy(relative_directory, "/");
         }
     }
     else
     {
-        // 如果出错，返回根目录
         strcpy(relative_directory, "/");
     }
 }
@@ -262,24 +257,20 @@ void handle_pwd_command(int client_socket, const char *current_directory, const 
     char response[512];
     char relative_directory[PATH_MAX];
 
-    // 获取相对于根目录的路径
     get_relative_path(root_directory, current_directory, relative_directory);
 
-    // 返回相对路径
     snprintf(response, sizeof(response), "257 \"%.400s\" is the current directory.\r\n", relative_directory);
     send(client_socket, response, strlen(response), 0);
 }
 
-// 辅助函数：检查新路径是否在根目录范围内
+// 检查新路径是否在根目录范围内
 int is_within_root(const char *root_directory, const char *new_directory)
 {
     char real_root[PATH_MAX], real_new[PATH_MAX];
 
-    // 获取 root_directory 和 new_directory 的真实绝对路径
     realpath(root_directory, real_root);
     realpath(new_directory, real_new);
 
-    // 检查 new_directory 是否以 root_directory 为前缀
     return strncmp(real_root, real_new, strlen(real_root)) == 0;
 }
 
@@ -288,40 +279,34 @@ void handle_cwd_command(int client_socket, const char *buffer, char *current_dir
     char new_path[PATH_MAX];
     char target_directory[PATH_MAX];
 
-    // 从 CWD 命令中提取目标路径
     sscanf(buffer, "CWD %s", target_directory);
 
-    // 检查路径长度是否会超出 PATH_MAX
     size_t current_len = strlen(current_directory);
     size_t target_len = strlen(target_directory);
 
-    if (current_len + 1 + target_len + 1 > PATH_MAX) // +1 for '/' and +1 for null terminator
+    if (current_len + 1 + target_len + 1 > PATH_MAX)
     {
         send_response(client_socket, "550 Path too long.\r\n");
         return;
     }
 
-    // 初始化 new_path 并拼接路径
-    strncpy(new_path, current_directory, PATH_MAX - 1);  // 复制 current_directory
-    new_path[PATH_MAX - 1] = '\0';  // 确保以 NULL 结尾
+    strncpy(new_path, current_directory, PATH_MAX - 1);
+    new_path[PATH_MAX - 1] = '\0';
 
     if (current_len > 0 && new_path[current_len - 1] != '/') {
-        strncat(new_path, "/", PATH_MAX - strlen(new_path) - 1);  // 添加斜杠
+        strncat(new_path, "/", PATH_MAX - strlen(new_path) - 1);
     }
 
-    strncat(new_path, target_directory, PATH_MAX - strlen(new_path) - 1);  // 拼接目标路径
+    strncat(new_path, target_directory, PATH_MAX - strlen(new_path) - 1);
 
-    // 检查是否超出根目录范围
     if (!is_within_root(root_directory, new_path))
     {
         send_response(client_socket, "550 Access denied. Cannot move outside root directory.\r\n");
         return;
     }
 
-    // 尝试切换到新路径
     if (chdir(new_path) == 0)
     {
-        // 使用 realpath 更新 current_directory 为 new_path 的真实绝对路径
         // char* q = realpath(new_path, current_directory);
         if (realpath(new_path, current_directory) != NULL)
         {

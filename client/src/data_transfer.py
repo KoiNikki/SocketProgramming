@@ -103,7 +103,6 @@ def handle_list_port(sock, data_socket):
         print(response)
 
 def receive_list_data(data_socket):
-    """通用接收列表数据的函数"""
     try:
         while True:
             data = data_socket.recv(1024).decode()
@@ -154,19 +153,25 @@ def handle_retr_pasv(sock, filename):
         response = sock.recv(1024).decode()
         print(response)
 
-def handle_retr_port(sock, filename, data_socket):
-    # PORT 模式下发送 RETR 命令
+def handle_retr_port(sock, filename, data_socket, timeout=10):
+    data_socket.settimeout(timeout)
+
     response = send_command(sock, f"RETR {filename}")
     print(response)
 
     if "150" in response:
-        # 接受服务器的连接并接收文件数据
-        client_socket, _ = data_socket.accept()
-        receive_file_data(client_socket, filename)
-        client_socket.close()
+        try:
+            client_socket, _ = data_socket.accept()
+            receive_file_data(client_socket, filename)
+            client_socket.close()
+        except socket.timeout:
+            print("Connection timeout. No incoming connection within the timeout period.")
+        finally:
+            data_socket.close()
 
         response = sock.recv(1024).decode()
         print(response)
+
 
 def handle_stor_pasv(sock, filename):
     # 使用 PASV 模式
@@ -193,22 +198,27 @@ def handle_stor_pasv(sock, filename):
         response = sock.recv(1024).decode()
         print(response)
 
-def handle_stor_port(sock, filename, data_socket):
-    # PORT 模式下发送 STOR 命令
+def handle_stor_port(sock, filename, data_socket, timeout=10):
+    data_socket.settimeout(timeout)
+
     response = send_command(sock, f"STOR {filename}")
     print(response)
 
     if "150" in response:
-        # 接受服务器的连接并发送文件数据
-        client_socket, _ = data_socket.accept()
-        send_file_data(client_socket, filename)
-        client_socket.close()
+        try:
+            client_socket, _ = data_socket.accept()
+            send_file_data(client_socket, filename)
+            client_socket.close()
+        except socket.timeout:
+            print("Connection timeout. No incoming connection within the timeout period.")
+        finally:
+            data_socket.close()
 
         response = sock.recv(1024).decode()
         print(response)
 
+
 def receive_file_data(data_socket, filename):
-    """从数据连接中接收文件数据并保存"""
     try:
         with open(filename, "wb") as f:
             while True:
@@ -220,7 +230,6 @@ def receive_file_data(data_socket, filename):
         data_socket.close()
 
 def send_file_data(data_socket, filename):
-    """从本地文件读取数据并发送到数据连接"""
     if not os.path.isfile(filename):
         print(f"File '{filename}' not found.")
         data_socket.close()
