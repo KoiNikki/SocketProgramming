@@ -18,13 +18,12 @@ int validate_password(const char *password) {
     return 0;
 }
 
-// 发送欢迎消息
+// welcome
 void handle_welcome(int client_socket) {
     const char *welcome_message = "220 Anonymous FTP server ready.\r\n";
     send_response(client_socket, welcome_message);
 }
 
-// 处理 USER 命令
 void handle_user_command(int client_socket, const char *buffer) {
     char username[100];
     sscanf(buffer, "USER %s", username);
@@ -37,7 +36,6 @@ void handle_user_command(int client_socket, const char *buffer) {
     }
 }
 
-// 处理 PASS 命令
 int handle_pass_command(int client_socket, const char *buffer) {
     char password[100];
     sscanf(buffer, "PASS %s", password);

@@ -15,7 +15,7 @@ def login(sock):
 
     if "331" in response:
         # password
-        email = input("Please enter your email address: ")
+        email = input("Please enter your email: ")
         response = send_command(sock, f"PASS {email}")
         print(response)
 

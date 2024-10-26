@@ -1,0 +1,1 @@
+To create a UDP-based chat program, each client needs to set up a UDP socket, binds it to a specific port, and uses multithreading to handle sending and receiving messages simultaneously. One thread listens for incoming packets, while another captures user input and sends messages to the peer’s IP and port.
