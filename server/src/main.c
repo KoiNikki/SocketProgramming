@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <getopt.h>
 #include "connection_manager.h"
 
 void run_server(int port, const char *directory)
@@ -49,8 +50,18 @@ int main(int argc, char *argv[])
     // int port = 21;
     int port = 2121;
     const char *directory = "tmp";
-    if (argc > 1) {
-        directory = argv[1];
+    int opt;
+
+    // 使用 getopt 解析命令行参数
+    while ((opt = getopt(argc, argv, "r:")) != -1) {
+        switch (opt) {
+            case 'r':  // 如果遇到 -root
+                directory = optarg;  // 获取文件夹路径
+                break;
+            default:
+                fprintf(stderr, "Usage: %s [-r root_directory]\n", argv[0]);
+                exit(EXIT_FAILURE);
+        }
     }
 
     run_server(port, directory);

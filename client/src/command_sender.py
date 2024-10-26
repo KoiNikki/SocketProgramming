@@ -28,3 +28,18 @@ def login(sock):
     else:
         print("Invalid username.")
         return False
+
+def handle_quit(sock):
+    response = send_command(sock, "QUIT")
+    print(response)
+    sock.close()
+    print("Disconnected from the server.")
+    
+def handle_syst(sock):
+    response = send_command(sock, "SYST")
+    print(response)
+
+
+def handle_type(sock, command):
+    response = send_command(sock, command.upper())
+    print(response)

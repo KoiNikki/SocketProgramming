@@ -232,3 +232,20 @@ def send_file_data(data_socket, filename):
                 data_socket.sendall(data)
     finally:
         data_socket.close()
+
+
+def handle_mkd(sock, dirname):
+    response = send_command(sock, f"MKD {dirname}")
+    print(response)
+
+def handle_cwd(sock, dirname):
+    response = send_command(sock, f"CWD {dirname}")
+    print(response)
+
+def handle_pwd(sock):
+    response = send_command(sock, "PWD")
+    print(response)
+
+def handle_rmd(sock, dirname):
+    response = send_command(sock, f"RMD {dirname}")
+    print(response)

@@ -1,14 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
+#include <linux/limits.h>
 #include "connection_manager.h"
 #include "auth.h"
 #include "command_parser.h"
-
 
 void handle_connections(int server_socket, int client_sockets[MAX_CLIENTS], const char *directory)
 {
@@ -17,6 +18,25 @@ void handle_connections(int server_socket, int client_sockets[MAX_CLIENTS], cons
     fd_set readfds;
     socklen_t addr_len = sizeof(client_addr);
     char buffer[1024];
+
+    char root_directory[PATH_MAX];
+
+    // 将传入的 directory 转换为绝对路径
+    if (realpath(directory, root_directory) == NULL) {
+        perror("Failed to resolve root directory absolute path");
+        exit(EXIT_FAILURE);
+    }
+    printf("Root directory set to: %s\n", root_directory);
+
+    // 为每个客户端分配一个当前目录的数组
+    char client_dirs[MAX_CLIENTS][MAX_DIR_LEN];
+
+    // 初始化每个客户端的当前目录为服务器的初始目录
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        strncpy(client_dirs[i], root_directory, MAX_DIR_LEN);
+        client_sockets[i] = 0;
+    }
 
     while (1)
     {
@@ -100,7 +120,7 @@ void handle_connections(int server_socket, int client_sockets[MAX_CLIENTS], cons
                 else
                 {
                     // 客户端发送了数据，处理该客户端的请求
-                    handle_client(sd, buffer, directory);
+                    handle_client(sd, buffer, client_dirs[i], root_directory);
                 }
             }
         }
