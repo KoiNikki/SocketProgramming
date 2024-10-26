@@ -19,4 +19,6 @@ void handle_cwd_command(int client_socket, const char *buffer, char *current_dir
 
 void handle_rmd_command(int client_socket, const char *dirpath);
 
+void send_response(int client_socket, const char *response);
+
 #endif // DATA_TRANSFER_H

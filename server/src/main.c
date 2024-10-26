@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <string.h>
 #include "connection_manager.h"
 
 void run_server(int port, const char *directory)
@@ -48,7 +49,6 @@ int main(int argc, char *argv[])
 {
     int port = 21;
     const char *directory = "tmp";
-    int opt;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-port") == 0 && i + 1 < argc) {

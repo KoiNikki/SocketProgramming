@@ -63,7 +63,7 @@ void handle_port_command(int client_socket, const char *buffer)
     // 解析 PORT 命令中的 IP 地址和端口
     if (sscanf(buffer, "PORT %d,%d,%d,%d,%d,%d", &h1, &h2, &h3, &h4, &p1, &p2) != 6)
     {
-        send(client_socket, "500 Syntax error, command unrecognized.\r\n", 41, 0);
+        send_response(client_socket, "500 Syntax error, command unrecognized.\r\n");
         return;
     }
 
@@ -81,12 +81,12 @@ void handle_port_command(int client_socket, const char *buffer)
     client_data_addr.sin_port = htons(port);
     if (inet_pton(AF_INET, ip, &client_data_addr.sin_addr) <= 0)
     {
-        send(client_socket, "500 Invalid IP address.\r\n", 25, 0);
+        send_response(client_socket, "500 Invalid IP address.\r\n");
         return;
     }
 
     // 发送成功响应
-    send(client_socket, "200 PORT command successful.\r\n", 30, 0);
+    send_response(client_socket, "200 PORT command successful.\r\n");
 }
 
 void handle_pasv_command(int client_socket)
@@ -99,7 +99,7 @@ void handle_pasv_command(int client_socket)
     if (passive_socket < 0)
     {
         perror("Passive socket creation failed");
-        send(client_socket, "500 Failed to enter passive mode.\r\n", 35, 0);
+        send_response(client_socket, "500 Failed to enter passive mode.\r\n");
         return;
     }
 
@@ -113,7 +113,7 @@ void handle_pasv_command(int client_socket)
     {
         perror("Bind failed");
         close(passive_socket);
-        send(client_socket, "500 Bind failed.\r\n", 18, 0);
+        send_response(client_socket, "500 Bind failed.\r\n");
         return;
     }
 
@@ -121,7 +121,7 @@ void handle_pasv_command(int client_socket)
     {
         perror("Listen failed");
         close(passive_socket);
-        send(client_socket, "500 Listen failed.\r\n", 20, 0);
+        send_response(client_socket, "500 Listen failed.\r\n");
         return;
     }
 
@@ -137,7 +137,7 @@ void handle_pasv_command(int client_socket)
     snprintf(response, sizeof(response), "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).\r\n",
              ip[0], ip[1], ip[2], ip[3], p[0], p[1]);
 
-    send(client_socket, response, strlen(response), 0);
+    send_response(client_socket, response);
 }
 
 // 实现 LIST 命令
@@ -146,11 +146,11 @@ void handle_list_command(int client_socket, char *current_directory)
     int data_socket = open_data_connection();
     if (data_socket < 0)
     {
-        send(client_socket, "425 Can't open data connection.\r\n", 33, 0);
+        send_response(client_socket, "425 Can't open data connection.\r\n");
         return;
     }
 
-    send(client_socket, "150 Here comes the directory listing.\r\n", 39, 0);
+    send_response(client_socket, "150 Here comes the directory listing.\r\n");
 
     DIR *dir = opendir(current_directory);
     struct dirent *entry;
@@ -158,7 +158,7 @@ void handle_list_command(int client_socket, char *current_directory)
 
     if (dir == NULL)
     {
-        send(client_socket, "550 Failed to open directory.\r\n", 31, 0);
+        send_response(client_socket, "550 Failed to open directory.\r\n");
         close(data_socket);
         return;
     }
@@ -171,7 +171,7 @@ void handle_list_command(int client_socket, char *current_directory)
 
     closedir(dir);
     close(data_socket);
-    send(client_socket, "226 Directory send OK.\r\n", 24, 0);
+    send_response(client_socket, "226 Directory send OK.\r\n");
 }
 
 // 实现 RETR 命令
@@ -180,19 +180,19 @@ void handle_retr_command(int client_socket, const char *filename)
     int data_socket = open_data_connection();
     if (data_socket < 0)
     {
-        send(client_socket, "425 Can't open data connection.\r\n", 33, 0);
+        send_response(client_socket, "425 Can't open data connection.\r\n");
         return;
     }
 
     int file_fd = open(filename, O_RDONLY);
     if (file_fd < 0)
     {
-        send(client_socket, "550 Failed to open file.\r\n", 26, 0);
+        send_response(client_socket, "550 Failed to open file.\r\n");
         close(data_socket);
         return;
     }
 
-    send(client_socket, "150 Opening binary mode data connection.\r\n", 42, 0);
+    send_response(client_socket, "150 Opening binary mode data connection.\r\n");
 
     char buffer[1024];
     int bytes_read;
@@ -203,7 +203,7 @@ void handle_retr_command(int client_socket, const char *filename)
 
     close(file_fd);
     close(data_socket);
-    send(client_socket, "226 Transfer complete.\r\n", 24, 0);
+    send_response(client_socket, "226 Transfer complete.\r\n");
 }
 
 // 实现 STOR 命令
@@ -212,19 +212,19 @@ void handle_stor_command(int client_socket, const char *filename)
     int data_socket = open_data_connection();
     if (data_socket < 0)
     {
-        send(client_socket, "425 Can't open data connection.\r\n", 33, 0);
+        send_response(client_socket, "226 Transfer complete.\r\n");
         return;
     }
 
     int file_fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (file_fd < 0)
     {
-        send(client_socket, "550 Failed to create file.\r\n", 28, 0);
+        send_response(client_socket, "550 Failed to create file.\r\n");
         close(data_socket);
         return;
     }
 
-    send(client_socket, "150 Opening binary mode data connection.\r\n", 42, 0);
+    send_response(client_socket, "150 Opening binary mode data connection.\r\n");
 
     char buffer[1024];
     int bytes_received;
@@ -235,7 +235,7 @@ void handle_stor_command(int client_socket, const char *filename)
 
     close(file_fd);
     close(data_socket);
-    send(client_socket, "226 Transfer complete.\r\n", 24, 0);
+    send_response(client_socket, "226 Transfer complete.\r\n");
 }
 
 // 辅助函数：生成相对路径
@@ -297,7 +297,7 @@ void handle_cwd_command(int client_socket, const char *buffer, char *current_dir
 
     if (current_len + 1 + target_len + 1 > PATH_MAX) // +1 for '/' and +1 for null terminator
     {
-        send(client_socket, "550 Path too long.\r\n", 20, 0);
+        send_response(client_socket, "550 Path too long.\r\n");
         return;
     }
 
@@ -314,7 +314,7 @@ void handle_cwd_command(int client_socket, const char *buffer, char *current_dir
     // 检查是否超出根目录范围
     if (!is_within_root(root_directory, new_path))
     {
-        send(client_socket, "550 Access denied. Cannot move outside root directory.\r\n", 55, 0);
+        send_response(client_socket, "550 Access denied. Cannot move outside root directory.\r\n");
         return;
     }
 
@@ -325,18 +325,16 @@ void handle_cwd_command(int client_socket, const char *buffer, char *current_dir
         // char* q = realpath(new_path, current_directory);
         if (realpath(new_path, current_directory) != NULL)
         {
-            send(client_socket, "250 Directory successfully changed.\r\n", 37, 0);
+            send_response(client_socket, "250 Directory successfully changed.\r\n");
         }
         else
         {
-            // 如果 realpath 失败，返回错误
-            send(client_socket, "550 Failed to resolve new directory path.\r\n", 44, 0);
+            send_response(client_socket, "550 Failed to resolve new directory path.\r\n");
         }
     }
     else
     {
-        // 如果目标目录不存在，返回错误
-        send(client_socket, "550 Failed to change directory. Directory does not exist.\r\n", 58, 0);
+        send_response(client_socket, "550 Failed to change directory. Directory does not exist.\r\n");
     }
 }
 
@@ -344,11 +342,11 @@ void handle_mkd_command(int client_socket, const char *dirpath)
 {
     if (mkdir(dirpath, 0777) == 0)
     {
-        send(client_socket, "257 Directory created successfully.\r\n", 36, 0);
+        send_response(client_socket, "257 Directory created successfully.\r\n");
     }
     else
     {
-        send(client_socket, "550 Failed to create directory.\r\n", 33, 0);
+        send_response(client_socket, "550 Failed to create directory.\r\n");
     }
 }
 
@@ -356,10 +354,15 @@ void handle_rmd_command(int client_socket, const char *dirpath)
 {
     if (rmdir(dirpath) == 0)
     {
-        send(client_socket, "250 Directory removed.\r\n", 24, 0);
+        send_response(client_socket, "250 Directory removed.\r\n");
     }
     else
     {
-        send(client_socket, "550 Failed to remove directory.\r\n", 33, 0);
+        send_response(client_socket, "550 Failed to remove directory.\r\n");
     }
+}
+
+void send_response(int client_socket, const char *response) {
+    size_t len = strlen(response);
+    send(client_socket, response, len, 0);
 }

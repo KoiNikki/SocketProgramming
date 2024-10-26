@@ -41,6 +41,8 @@ class TestServer:
         f.close()
 
     def test_public(self, port=21, directory='/tmp'):
+        print("Current working directory:", os.getcwd())
+        print("Directory contents:", os.listdir(os.getcwd()))
         if port == 21 and directory == '/tmp':
             server = subprocess.Popen(['sudo', './server'], stdout=subprocess.PIPE)
         else:

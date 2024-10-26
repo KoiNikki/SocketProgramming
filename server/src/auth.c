@@ -2,6 +2,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include "auth.h"
+#include "data_transfer.h"
 
 int validate_user(const char *username) {
     if (strcmp(username, "anonymous") == 0) {
@@ -19,7 +20,8 @@ int validate_password(const char *password) {
 
 // 发送欢迎消息
 void handle_welcome(int client_socket) {
-    send(client_socket, "220 Anonymous FTP server ready.\r\n", 34, 0);
+    const char *welcome_message = "220 Anonymous FTP server ready.\r\n";
+    send_response(client_socket, welcome_message);
 }
 
 // 处理 USER 命令
@@ -27,9 +29,11 @@ void handle_user_command(int client_socket, const char *buffer) {
     char username[100];
     sscanf(buffer, "USER %s", username);
     if (validate_user(username)) {
-        send(client_socket, "331 Please specify the password.\r\n", 34, 0);
+        const char *response = "331 Please provide the password.\r\n";
+        send_response(client_socket, response);
     } else {
-        send(client_socket, "530 Invalid username.\r\n", 23, 0);
+        const char *response = "530 Invalid username.\r\n";
+        send_response(client_socket, response);
     }
 }
 
@@ -38,10 +42,12 @@ int handle_pass_command(int client_socket, const char *buffer) {
     char password[100];
     sscanf(buffer, "PASS %s", password);
     if (validate_password(password)) {
-        send(client_socket, "230 Login successful.\r\n", 23, 0);
+        const char *response = "230 Login successful.\r\n";
+        send_response(client_socket, response);
         return 1;
     } else {
-        send(client_socket, "530 Invalid password.\r\n", 23, 0);
+        const char *response = "530 Invalid password.\r\n";
+        send_response(client_socket, response);
         return 0;
     }
 }
